@@ -2,6 +2,13 @@
 name = "win-service-logger"
 version = "0.1.0"
 edition = "2021"
+authors = ["null.black Inc. <opensource@null.black>", "Troy Neubauer <troy@null.black>"]
+repository = "https://github.com/nulldotblack/win-service-logger"
+readme = "README.md"
+documentation = "https://docs.rs/win-service-logger"
+description = "A logger backend which writes messages to the Windows Event Viewer"
+license = "MIT"
+keywords = ["logger", "windows", "service"]
 
 [dependencies]
 log = "0.4"
