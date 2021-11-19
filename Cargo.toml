@@ -1,0 +1,9 @@
+[package]
+name = "win-service-logger"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4"
+winapi = { version = "0.3", features = ["winbase", "winnt"] }
+widestring = "0.5"

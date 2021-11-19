@@ -1,0 +1,126 @@
+use std::cell::UnsafeCell;
+use std::ffi::CString;
+use std::sync::Once;
+
+use log::{Level, Metadata, Record};
+use winapi::um::winnt::HANDLE;
+
+pub struct Logger {
+    handle: UnsafeCell<HANDLE>,
+    handle_init: Once,
+    log_name: &'static str,
+}
+
+unsafe impl Send for Logger {}
+unsafe impl Sync for Logger {}
+
+pub static LOGGER: Logger = Logger::new("Rust Application");
+
+/// Initializes the global logger with a windows service logger
+///
+/// # Panics
+///
+/// This function will panic if a global logger has already been set
+/// Use [`try_init`] for a fallable function
+pub fn init() {
+    try_init().unwrap();
+}
+
+/// Initializes the global logger with a windows service logger
+/// 
+/// # Errors
+///
+/// This function fails if a global logger has already been set
+pub fn try_init() -> Result<(), log::SetLoggerError> {
+    log::set_logger(&LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug))
+}
+
+impl Logger {
+    const fn new(log_name: &'static str) -> Self {
+        Self {
+            handle: UnsafeCell::new(std::ptr::null_mut()),
+            log_name,
+            handle_init: Once::new(),
+        }
+    }
+}
+
+impl log::Log for Logger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= Level::Debug
+    }
+
+    fn log(&self, record: &Record) {
+        if self.enabled(record.metadata()) {
+            // We use a Once and unsafe cell so that we can lazily initialize `self.handle`
+            // We need to have Self in a static, so new must be const
+            // `self.handle` is initialized once and then read multiple times so doing it this way
+            // means we don't need to acquire a mutex every time to read `self.handle`
+            self.handle_init.call_once(|| {
+                let c_str = CString::new(self.log_name).unwrap();
+                // # Safety:
+                // 1. `c_str` is a valid null terminated string
+                // 2. WinAPI call
+                let handle = unsafe {
+                    winapi::um::winbase::RegisterEventSourceA(std::ptr::null_mut(), c_str.as_ptr())
+                };
+                // # Safety.
+                // We are inside a Once's init block therefore we have exclusive access
+                // to self.handle
+                unsafe { *self.handle.get() = handle };
+            });
+            let msg = format!(
+                "{}({}): {} - {}",
+                record.file().unwrap_or("<unknown>"),
+                record.line().unwrap_or(0),
+                record.level(),
+                record.args()
+            );
+
+            let event_type = match record.metadata().level() {
+                Level::Trace => winapi::um::winnt::EVENTLOG_INFORMATION_TYPE,
+                Level::Debug => winapi::um::winnt::EVENTLOG_INFORMATION_TYPE,
+                Level::Info => winapi::um::winnt::EVENTLOG_INFORMATION_TYPE,
+                Level::Warn => winapi::um::winnt::EVENTLOG_WARNING_TYPE,
+                Level::Error => winapi::um::winnt::EVENTLOG_ERROR_TYPE,
+            };
+            let wide_msg = widestring::U16CString::from_str(msg).unwrap();
+            let mut strings = [wide_msg.as_ptr()];
+
+            // # Safety:
+            // 1. The init block has completed so there are no exclusive references to `self.handle`.
+            // 2. The init block has completed so we have established a happens before relationship
+            //    with the initializing thread. Therefore we will see the initialized value
+            let handle = unsafe { *self.handle.get() };
+
+            // # Safety:
+            // 1. strings is a pointer to a null terminated message utf-16 string
+            // 2. The length of strings is 1 and we pass one as the length
+            // 3. WinAPI call
+            unsafe {
+                winapi::um::winbase::ReportEventW(
+                    handle,
+                    event_type,
+                    0,
+                    0,
+                    std::ptr::null_mut(),
+                    1, //length
+                    0,
+                    &mut strings as *mut *const _,
+                    std::ptr::null_mut(),
+                )
+            };
+        }
+    }
+
+    fn flush(&self) {}
+}
+
+impl Drop for Logger {
+    fn drop(&mut self) {
+        // # Safety:
+        // WinAPI call
+        let handle = *self.handle.get_mut();
+        let _ = unsafe { winapi::um::winbase::DeregisterEventSource(handle) };
+    }
+}
