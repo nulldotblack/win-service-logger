@@ -1,6 +1,6 @@
 [package]
 name = "win-service-logger"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["null.black Inc. <opensource@null.black>", "Troy Neubauer <troy@null.black>"]
 repository = "https://github.com/nulldotblack/win-service-logger"
@@ -9,6 +9,14 @@ documentation = "https://docs.rs/win-service-logger"
 description = "A logger backend which writes messages to the Windows Event Viewer"
 license = "MIT"
 keywords = ["logger", "windows", "service"]
+
+[package.metadata.docs.rs]
+default-target = "x86_64-pc-windows-msvc"
+targets = [
+    "aarch64-pc-windows-msvc",
+    "i686-pc-windows-msvc",
+    "x86_64-pc-windows-msvc",
+]
 
 [dependencies]
 log = "0.4"
