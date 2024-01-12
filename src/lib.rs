@@ -43,7 +43,7 @@ pub fn init() {
 }
 
 /// Initializes the global logger with a windows service logger
-/// 
+///
 /// # Errors
 ///
 /// This function fails if a global logger has already been set
@@ -51,11 +51,10 @@ pub fn try_init() -> Result<(), log::SetLoggerError> {
     log::set_logger(&LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug))
 }
 
-
 /// Initializes the global logger with a windows service logger.
-/// 
+///
 /// This function leaks a single `Logger` to the heap in order to give a static reference to log
-/// 
+///
 /// # Errors
 ///
 /// This function fails if a global logger has already been set
@@ -65,7 +64,7 @@ pub fn try_init_with_name(name: &'static str) -> Result<(), log::SetLoggerError>
 }
 
 /// Initializes the global logger with a windows service logger
-/// 
+///
 /// This function leaks a single `Logger` to the heap in order to give a static reference to log
 ///
 /// # Panics
@@ -73,7 +72,9 @@ pub fn try_init_with_name(name: &'static str) -> Result<(), log::SetLoggerError>
 /// This function will panic if a global logger has already been set
 pub fn init_with_name(name: &'static str) {
     let logger = Box::leak(Box::new(Logger::new(name)));
-    log::set_logger(logger).map(|()| log::set_max_level(log::LevelFilter::Debug)).unwrap();
+    log::set_logger(logger)
+        .map(|()| log::set_max_level(log::LevelFilter::Debug))
+        .unwrap();
 }
 
 impl Logger {
